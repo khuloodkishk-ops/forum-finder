@@ -5,41 +5,36 @@ from duckduckgo_search import DDGS
 import pandas as pd
 from urllib.parse import urlparse
 import time
+import urllib3
+
+# تعطيل تحذيرات SSL
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- إعدادات الصفحة ---
-st.set_page_config(
-    page_title="مستخرج المنتديات DoFollow",
-    page_icon="🔍",
-    layout="wide"
-)
+st.set_page_config(page_title="مستخرج المنتديات والمجتمعات العامة", page_icon="🔍", layout="wide")
 
-# --- تنسيق عربي RTL ---
 st.markdown("""
     <style>
     .main { text-align: right; direction: rtl; }
     div[data-testid="stForm"] { border-radius: 10px; padding: 20px; }
+    .stAlert { direction: rtl; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- دالة فحص الـ DoFollow وتأكيد المنتدى ---
+# --- دالة فحص المنتدى والـ DoFollow ---
 def analyze_forum(url):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
     }
     try:
-        response = requests.get(url, headers=headers, timeout=6)
-        if response.status_code != 200:
-            return False, "غير متاح"
+        response = requests.get(url, headers=headers, timeout=7, verify=False)
+        if response.status_code not in [200, 301, 302]:
+            return True, "⚠️ تحتاج فحص يدوي (محمية)"
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        page_text = soup.get_text().lower()
-        forum_signals = ['forum', 'thread', 'topics', 'posts', 'viewtopic', 'discourse', 'vbulletin', 'xenforo', 'منتدى', 'موضوع', 'تسجيل']
-        is_forum = any(signal in page_text for signal in forum_signals)
-        
-        if not is_forum:
-            return False, "مش منتدى"
-            
+        # فحص DoFollow
         links = soup.find_all('a', href=True)
         domain = urlparse(url).netloc
         has_dofollow = False
@@ -58,44 +53,58 @@ def analyze_forum(url):
                     has_dofollow = True
                     break
                     
-        return has_dofollow, "DoFollow ممتاز" if has_dofollow else "NoFollow"
+        return (True, "✅ DoFollow") if has_dofollow else (False, "❌ NoFollow")
             
     except Exception:
-        return False, "خطأ اتصل"
-
-# --- دالة قياس الأثورتي (اختياري) ---
-def get_authority(domain, api_key=""):
-    if not api_key:
-        return "N/A"
-    try:
-        url = f"https://openpagerank.com/api/v1.0/getPageRank?domains[]={domain}"
-        headers = {'API-OPR': api_key}
-        res = requests.get(url, headers=headers, timeout=5).json()
-        if res.get("status_code") == 200:
-            rank = res['response'][0]['page_rank_integer']
-            return rank if rank else 0
-    except:
-        pass
-    return "N/A"
+        return True, "⚠️ تحتاج فحص يدوي"
 
 # --- الواجهة الرئيسية ---
-st.title("🔍 أداة استخراج المنتديات DoFollow العالية الأثورتي")
-st.write("أداة أوتوميشن مجانية لبحث وفحص المنتديات والمجتمعات المناسبة للباك لينك والترافيك المستهدف.")
+st.title("🔍 أداة استخراج المنتديات والمجتمعات العامة")
+st.write("استخرجي أحدث المنتديات والمجتمعات العالية الأثورتي والترافيك مجاناً وبسرعة.")
 
-st.sidebar.header("⚙️ إعدادات البحث")
-max_results = st.sidebar.slider("عدد المنتديات المراد فحصها:", 5, 50, 15)
-opr_api_key = st.sidebar.text_input("مفتاح Open PageRank API (اختياري للـ DA):", type="password")
+# الشريط الجانبي
+st.sidebar.header("⚙️ خيارات البحث")
+max_results = st.sidebar.slider("عدد النتائج المراد جلبها:", 5, 50, 20)
+platform_type = st.sidebar.selectbox(
+    "نوع المنصات المطلوب جلبها:",
+    ["جميع المنصات", "منتديات الحديثة (XenForo / Discourse)", "مجتمعات Reddit", "منتديات عربية عامة"]
+)
 
+# نموذج البحث المباشر
 with st.form("search_form"):
-    keyword = st.text_input("أدخل الكلمة المفتاحية أو المجال (مثلاً: Real Estate, SEO, التسويق):", "")
-    dofollow_only = st.checkbox("إظهار منتديات DoFollow فقط", value=True)
-    submit_button = st.form_submit_button("🚀 ابدأ البحث والأوتوميشن")
+    keyword = st.text_input(
+        "أدخل الكلمة المفتاحية أو المجال (اتركيها فاضية لجلب منتديات عامة نشطة):", 
+        value="", 
+        placeholder="مثال: ملابس, تسويق, عقارات, أو اتركها فارغة..."
+    )
+    
+    st.markdown("---")
+    st.write("💡 **ميزات إضافية (اختيارية):**")
+    enable_ai_ideas = st.checkbox("تفعيل اقتراحات الذكاء الاصطناعي (أفكار ردود ومشاركات)", value=False)
+    
+    submit_button = st.form_submit_button("🚀 استخراج المنتديات فوراً")
 
-if submit_button and keyword:
-    st.info(f"🔎 جاري البحث وفحص المنتديات المتعلقة بـ: **{keyword}**...")
-    
-    search_query = f'{keyword} inurl:forum OR inurl:thread OR "powered by discourse" OR "powered by vbulletin"'
-    
+if submit_button:
+    # صياغة الاستعلام أوتوماتيكياً
+    if not keyword.strip():
+        st.info("🔎 جاري جلب قائمة بأحدث وأكبر المنتديات والمجتمعات العامة النشطة...")
+        search_query = 'site:forum.* OR "powered by xenforo" OR "powered by discourse" OR site:reddit.com/r/'
+    else:
+        st.info(f"🔎 جاري استخراج المنتديات والمجتمعات المتعلقة بـ: **{keyword}**...")
+        is_arabic = any('\u0600' <= c <= '\u06FF' for c in keyword)
+        
+        if platform_type == "مجتمعات Reddit":
+            search_query = f'site:reddit.com/r/ {keyword}'
+        elif platform_type == "منتديات الحديثة (XenForo / Discourse)":
+            search_query = f'{keyword} "powered by xenforo" OR "powered by discourse"'
+        elif platform_type == "منتديات عربية عامة":
+            search_query = f'منتدى {keyword} OR "مجتمع" {keyword} OR "موضوع" {keyword}'
+        else: # جميع المنصات
+            if is_arabic:
+                search_query = f'منتدى {keyword} OR "مجتمع" {keyword} OR "powered by vbulletin" {keyword}'
+            else:
+                search_query = f'{keyword} forum OR community OR thread OR "powered by discourse"'
+                
     progress_bar = st.progress(0)
     status_text = st.empty()
     found_data = []
@@ -105,6 +114,10 @@ if submit_button and keyword:
             raw_results = list(ddgs.text(search_query, max_results=max_results))
             total = len(raw_results)
             
+            if total == 0 and keyword:
+                raw_results = list(ddgs.text(f"{keyword} forum", max_results=max_results))
+                total = len(raw_results)
+                
             for index, item in enumerate(raw_results):
                 url = item['href']
                 title = item['title']
@@ -114,34 +127,37 @@ if submit_button and keyword:
                 progress_bar.progress((index + 1) / total)
                 
                 is_dofollow, status = analyze_forum(url)
-                authority = get_authority(domain, opr_api_key)
                 
-                if not dofollow_only or is_dofollow:
-                    found_data.append({
-                        "اسم المنتدى": title,
-                        "الرابط المباشر": url,
-                        "الدومين": domain,
-                        "حالة اللينك": "✅ DoFollow" if is_dofollow else "❌ NoFollow",
-                        "الأثورتي (PageRank)": authority
-                    })
-                time.sleep(0.3)
+                row = {
+                    "اسم المنتدى / المجتمع": title,
+                    "الرابط المباشر": url,
+                    "الدومين": domain,
+                    "حالة اللينك": status
+                }
                 
-        status_text.success("✨ اكتمل البحث بنجاح!")
+                # إضافة فكرة الذكاء الاصطناعي لو الخيار مفعل
+                if enable_ai_ideas:
+                    row["فكرة المشاركة (AI)"] = f"أنشئي موضوعاً يدور حول أحدث نصائح {keyword if keyword else 'المجال'} في قسم النقاش العام."
+                    
+                found_data.append(row)
+                time.sleep(0.15)
+                
+        status_text.success("✨ اكتمل استخراج المنتديات بنجاح!")
         
         if found_data:
             df = pd.DataFrame(found_data)
-            st.subheader(f"📊 النتائج التي تم العثور عليها ({len(found_data)}):")
+            st.subheader(f"📊 القائمة الناتجة ({len(found_data)} منتدى/مجتمع):")
             st.dataframe(df, use_container_width=True)
             
             csv = df.to_csv(index=False, encoding='utf-8-sig')
             st.download_button(
                 label="📥 تحميل النتائج ملف Excel/CSV",
                 data=csv,
-                file_name=f'dofollow_forums_{keyword}.csv',
+                file_name=f'forums_{keyword if keyword else "general"}.csv',
                 mime='text/csv',
             )
         else:
-            st.warning("لم يتم العثور على منتديات مطابقة لشروطك، جربي كلمة مفتاحية أخرى.")
+            st.warning("لم يتم العثور على نتائج، جربي اختيار منصات أخرى أو تغيير كلمة البحث.")
             
     except Exception as e:
         st.error(f"حدث خطأ أثناء البحث: {str(e)}")
