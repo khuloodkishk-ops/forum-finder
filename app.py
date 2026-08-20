@@ -1,23 +1,21 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-from duckduckgo_search import DDGS
 import pandas as pd
 from urllib.parse import urlparse
 import time
 import urllib3
+import json
 
-# تعطيل تحذيرات SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- إعدادات الصفحة ---
-st.set_page_config(page_title="مستخرج المنتديات والمجتمعات العامة", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="مستخرج المنتديات والمجتمعات", page_icon="🔍", layout="wide")
 
 st.markdown("""
     <style>
     .main { text-align: right; direction: rtl; }
     div[data-testid="stForm"] { border-radius: 10px; padding: 20px; }
-    .stAlert { direction: rtl; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -25,16 +23,14 @@ st.markdown("""
 def analyze_forum(url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept-Language': 'ar,en-US;q=0.9,en;q=0.8',
     }
     try:
-        response = requests.get(url, headers=headers, timeout=7, verify=False)
+        response = requests.get(url, headers=headers, timeout=6, verify=False)
         if response.status_code not in [200, 301, 302]:
-            return True, "⚠️ تحتاج فحص يدوي (محمية)"
+            return True, "⚠️ تحتاج فحص يدوي"
             
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # فحص DoFollow
         links = soup.find_all('a', href=True)
         domain = urlparse(url).netloc
         has_dofollow = False
@@ -58,66 +54,75 @@ def analyze_forum(url):
     except Exception:
         return True, "⚠️ تحتاج فحص يدوي"
 
+# --- دالة البحث المباشر عبر Serper.dev (Google API) ---
+def search_serper(query, api_key, num_results=15):
+    url = "https://google.serper.dev/search"
+    payload = json.dumps({
+        "q": query,
+        "num": num_results,
+        "gl": "eg",
+        "hl": "ar"
+    })
+    headers = {
+        'X-API-KEY': api_key,
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=payload, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            organic = data.get("organic", [])
+            results = []
+            for item in organic:
+                results.append({
+                    "title": item.get("title", ""),
+                    "href": item.get("link", "")
+                })
+            return results
+        else:
+            st.error("مفتاح API غير صحيح أو انتهى الرصيد، يرجى التأكد منه.")
+            return []
+    except Exception as e:
+        st.error(f"خطأ في الاتصال: {str(e)}")
+        return []
+
 # --- الواجهة الرئيسية ---
-st.title("🔍 أداة استخراج المنتديات والمجتمعات العامة")
-st.write("استخرجي أحدث المنتديات والمجتمعات العالية الأثورتي والترافيك مجاناً وبسرعة.")
+st.title("🔍 أداة استخراج المنتديات والمجتمعات (Serper Engine)")
+st.write("أداة أوتوميشن مجانية لبحث وفحص المنتديات والمجتمعات الرسمية من جوجل مباشرة.")
 
 # الشريط الجانبي
-st.sidebar.header("⚙️ خيارات البحث")
-max_results = st.sidebar.slider("عدد النتائج المراد جلبها:", 5, 50, 20)
-platform_type = st.sidebar.selectbox(
-    "نوع المنصات المطلوب جلبها:",
-    ["جميع المنصات", "منتديات الحديثة (XenForo / Discourse)", "مجتمعات Reddit", "منتديات عربية عامة"]
-)
+st.sidebar.header("🔑 إعدادات المفتاح والبحث")
+serper_api_key = st.sidebar.text_input("ألصقي مفتاح Serper API هنا:", type="password")
+max_results = st.sidebar.slider("عدد النتائج المراد جلبها:", 5, 30, 15)
 
 # نموذج البحث المباشر
 with st.form("search_form"):
-    keyword = st.text_input(
-        "أدخل الكلمة المفتاحية أو المجال (اتركيها فاضية لجلب منتديات عامة نشطة):", 
-        value="", 
-        placeholder="مثال: ملابس, تسويق, عقارات, أو اتركها فارغة..."
-    )
-    
-    st.markdown("---")
-    st.write("💡 **ميزات إضافية (اختيارية):**")
-    enable_ai_ideas = st.checkbox("تفعيل اقتراحات الذكاء الاصطناعي (أفكار ردود ومشاركات)", value=False)
-    
-    submit_button = st.form_submit_button("🚀 استخراج المنتديات فوراً")
+    keyword = st.text_input("أدخل الكلمة المفتاحية أو المجال (مثلاً: ملابس, تسويق, عقارات):", value="ملابس")
+    submit_button = st.form_submit_button("🚀 ابدأ البحث والأوتوميشن")
 
 if submit_button:
-    # صياغة الاستعلام أوتوماتيكياً
-    if not keyword.strip():
-        st.info("🔎 جاري جلب قائمة بأحدث وأكبر المنتديات والمجتمعات العامة النشطة...")
-        search_query = 'site:forum.* OR "powered by xenforo" OR "powered by discourse" OR site:reddit.com/r/'
+    if not serper_api_key:
+        st.warning("⚠️ يرجى لصق مفتاح Serper API في القائمة الجانبية على اليمين أولاً لتشغيل البحث!")
+    elif not keyword.strip():
+        st.warning("يرجى كتابة كلمة مفتاحية للبحث.")
     else:
-        st.info(f"🔎 جاري استخراج المنتديات والمجتمعات المتعلقة بـ: **{keyword}**...")
-        is_arabic = any('\u0600' <= c <= '\u06FF' for c in keyword)
+        st.info(f"🔎 جاري البحث في جوجل عن منتديات ومجتمعات: **{keyword}**...")
         
-        if platform_type == "مجتمعات Reddit":
-            search_query = f'site:reddit.com/r/ {keyword}'
-        elif platform_type == "منتديات الحديثة (XenForo / Discourse)":
-            search_query = f'{keyword} "powered by xenforo" OR "powered by discourse"'
-        elif platform_type == "منتديات عربية عامة":
-            search_query = f'منتدى {keyword} OR "مجتمع" {keyword} OR "موضوع" {keyword}'
-        else: # جميع المنصات
-            if is_arabic:
-                search_query = f'منتدى {keyword} OR "مجتمع" {keyword} OR "powered by vbulletin" {keyword}'
-            else:
-                search_query = f'{keyword} forum OR community OR thread OR "powered by discourse"'
-                
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    found_data = []
-    
-    try:
-        with DDGS() as ddgs:
-            raw_results = list(ddgs.text(search_query, max_results=max_results))
-            total = len(raw_results)
+        is_arabic = any('\u0600' <= c <= '\u06FF' for c in keyword)
+        if is_arabic:
+            query = f'منتدى {keyword} OR "مجتمع" {keyword} OR site:forum.* {keyword}'
+        else:
+            query = f'{keyword} forum OR community OR "powered by discourse"'
             
-            if total == 0 and keyword:
-                raw_results = list(ddgs.text(f"{keyword} forum", max_results=max_results))
-                total = len(raw_results)
-                
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        raw_results = search_serper(query, serper_api_key, num_results=max_results)
+        total = len(raw_results)
+        found_data = []
+        
+        if total > 0:
             for index, item in enumerate(raw_results):
                 url = item['href']
                 title = item['title']
@@ -128,36 +133,26 @@ if submit_button:
                 
                 is_dofollow, status = analyze_forum(url)
                 
-                row = {
+                found_data.append({
                     "اسم المنتدى / المجتمع": title,
                     "الرابط المباشر": url,
                     "الدومين": domain,
                     "حالة اللينك": status
-                }
+                })
+                time.sleep(0.1)
                 
-                # إضافة فكرة الذكاء الاصطناعي لو الخيار مفعل
-                if enable_ai_ideas:
-                    row["فكرة المشاركة (AI)"] = f"أنشئي موضوعاً يدور حول أحدث نصائح {keyword if keyword else 'المجال'} في قسم النقاش العام."
-                    
-                found_data.append(row)
-                time.sleep(0.15)
-                
-        status_text.success("✨ اكتمل استخراج المنتديات بنجاح!")
-        
-        if found_data:
+            status_text.success("✨ اكتمل استخراج النتائج من جوجل بنجاح!")
+            
             df = pd.DataFrame(found_data)
-            st.subheader(f"📊 القائمة الناتجة ({len(found_data)} منتدى/مجتمع):")
+            st.subheader(f"📊 المنتديات والمجتمعات التي تم العثور عليها ({len(found_data)} موقع):")
             st.dataframe(df, use_container_width=True)
             
             csv = df.to_csv(index=False, encoding='utf-8-sig')
             st.download_button(
                 label="📥 تحميل النتائج ملف Excel/CSV",
                 data=csv,
-                file_name=f'forums_{keyword if keyword else "general"}.csv',
+                file_name=f'google_forums_{keyword}.csv',
                 mime='text/csv',
             )
         else:
-            st.warning("لم يتم العثور على نتائج، جربي اختيار منصات أخرى أو تغيير كلمة البحث.")
-            
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء البحث: {str(e)}")
+            st.error("لم يتم العثور على نتائج، تأكدي من صحة المفتاح.")
