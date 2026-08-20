@@ -54,17 +54,19 @@ def analyze_forum(url):
     except Exception:
         return True, "⚠️ تحتاج فحص يدوي"
 
-# --- دالة البحث المباشر عبر Serper.dev (Google API) ---
+# --- دالة البحث المباشر عبر Serper.dev ---
 def search_serper(query, api_key, num_results=15):
     url = "https://google.serper.dev/search"
+    clean_api_key = str(api_key).strip()
+    
     payload = json.dumps({
         "q": query,
-        "num": num_results,
+        "num": int(num_results),
         "gl": "eg",
         "hl": "ar"
     })
     headers = {
-        'X-API-KEY': api_key,
+        'X-API-KEY': clean_api_key,
         'Content-Type': 'application/json'
     }
     
@@ -81,10 +83,10 @@ def search_serper(query, api_key, num_results=15):
                 })
             return results
         else:
-            st.error("مفتاح API غير صحيح أو انتهى الرصيد، يرجى التأكد منه.")
+            st.error(f"🚨 تفاصيل الاستجابة من Serper (كود {response.status_code}): {response.text}")
             return []
     except Exception as e:
-        st.error(f"خطأ في الاتصال: {str(e)}")
+        st.error(f"خطأ في الاتصال بالشبكة: {str(e)}")
         return []
 
 # --- الواجهة الرئيسية ---
@@ -98,7 +100,7 @@ max_results = st.sidebar.slider("عدد النتائج المراد جلبها:"
 
 # نموذج البحث المباشر
 with st.form("search_form"):
-    keyword = st.text_input("أدخل الكلمة المفتاحية أو المجال (مثلاً: ملابس, تسويق, عقارات):", value="ملابس")
+    keyword = st.text_input("أدخل الكلمة المفتاحية أو المجال (مثلاً: ملابس, تسويق, عقارات):", value="جريده")
     submit_button = st.form_submit_button("🚀 ابدأ البحث والأوتوميشن")
 
 if submit_button:
@@ -154,5 +156,3 @@ if submit_button:
                 file_name=f'google_forums_{keyword}.csv',
                 mime='text/csv',
             )
-        else:
-            st.error("لم يتم العثور على نتائج، تأكدي من صحة المفتاح.")
