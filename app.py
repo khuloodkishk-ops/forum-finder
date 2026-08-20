@@ -10,7 +10,7 @@ import json
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # --- إعدادات الصفحة ---
-st.set_page_config(page_title="دليل واستخراج المنتديات العربية الكبرى", page_icon="🌺", layout="wide")
+st.set_page_config(page_title="مستخرج لينكات المنتديات فقط", page_icon="💬", layout="wide")
 
 st.markdown("""
     <style>
@@ -19,16 +19,16 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- قائمة المنتديات النسائية والعامة الأيقونية الجاهزة ---
+# --- قائمة المنتديات النسائية والعامة الجاهزة (منتديات فقط) ---
 FEATURED_FORUMS = [
-    {"اسم المنتدى": "منتديات عالم حواء", "الرابط المباشر": "https://forum.hawaaworld.com", "التخصص": "نسائي / موضة / طبخ / جمال", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتديات سيدتي", "الرابط المباشر": "https://forum.sayidaty.net", "التخصص": "نسائي / أزياء / عائلة", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتديات كويتيات النسائية", "الرابط المباشر": "https://www.q8yat.com", "التخصص": "نسائي / موضة / تجميل", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتدى مجتمعات حواء", "الرابط المباشر": "https://www.hawaa.com", "التخصص": "نسائي / لايف ستايل", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتدى سوبر ماما (مجتمع الأمهات)", "الرابط المباشر": "https://www.supermama.me/community", "التخصص": "أمهات / عائلة / أطفال", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتديات شباب وبنات مصر", "الرابط المباشر": "https://shbab2.com/vb", "التخصص": "عام / مصر / موضة", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتدى فتكات (مجتمع المرأة)", "الرابط المباشر": "https://fatakat.com", "التخصص": "نسائي / وصفات / أزياء", "حالة اللينك": "✅ DoFollow / معتمد"},
-    {"اسم المنتدى": "منتدى ترايدنت (مجتمع الأعمال والتسويق)", "الرابط المباشر": "https://www.traidnt.net/vb", "التخصص": "تسويق / تجارة / مواقع", "حالة اللينك": "✅ DoFollow / معتمد"},
+    {"اسم المنتدى": "منتديات عالم حواء", "الرابط المباشر": "https://forum.hawaaworld.com", "التخصص": "منتدى نسائي / موضة / جمال", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتديات سيدتي", "الرابط المباشر": "https://forum.sayidaty.net", "التخصص": "منتدى نسائي / أزياء / عائلة", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتديات كويتيات النسائية", "الرابط المباشر": "https://www.q8yat.com", "التخصص": "منتدى نسائي / تجميل", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتدى فتكات النسائي", "الرابط المباشر": "https://fatakat.com", "التخصص": "منتدى نسائي / أزياء", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتديات شباب وبنات مصر", "الرابط المباشر": "https://shbab2.com/vb", "التخصص": "منتدى عام / موضة", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتديات الخليج العربي", "الرابط المباشر": "https://www.alkhalij.org/vb", "التخصص": "منتدى عام / نقاشات", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتدى ترايدنت للأعمال والتسويق", "الرابط المباشر": "https://www.traidnt.net/vb", "التخصص": "منتدى تسويق وتجارة", "حالة اللينك": "✅ DoFollow"},
+    {"اسم المنتدى": "منتديات حواء العرب", "الرابط المباشر": "https://www.hawaa.com", "التخصص": "منتدى نسائي عام", "حالة اللينك": "✅ DoFollow"},
 ]
 
 # --- دالة فحص الـ DoFollow ---
@@ -66,8 +66,8 @@ def analyze_forum(url):
     except Exception:
         return True, "⚠️ تحتاج فحص يدوي"
 
-# --- دالة البحث المباشر عبر Serper.dev ---
-def search_serper(query, api_key, num_results=15):
+# --- دالة البحث الفردي عبر Serper ---
+def search_serper_single(query, api_key, num_results=15):
     url = "https://google.serper.dev/search"
     clean_api_key = str(api_key).strip()
     
@@ -95,69 +95,102 @@ def search_serper(query, api_key, num_results=15):
                 })
             return results
         else:
-            st.error(f"🚨 تفاصيل الاستجابة من Serper (كود {response.status_code}): {response.text}")
             return []
-    except Exception as e:
-        st.error(f"خطأ في الاتصال بالشبكة: {str(e)}")
+    except Exception:
         return []
 
+# --- دالة البحث المجمع المخصصة للمنتديات فقط ---
+def search_forums_only(keyword, category, api_key, max_per_query=15):
+    clean_kw = keyword.strip()
+    queries = []
+    
+    if category == "🌸 منتديات نسائية وموضة وأزياء":
+        if clean_kw:
+            queries = [f'منتدى {clean_kw}', f'منتديات {clean_kw}', f'منتدى نسائي {clean_kw}']
+        else:
+            queries = ['منتدى نسائي', 'منتديات حواء', 'منتدى سيدات']
+            
+    elif category == "💼 منتديات تجارة وتسويق وبزنس":
+        if clean_kw:
+            queries = [f'منتدى تسويق {clean_kw}', f'منتدى تجارة {clean_kw}']
+        else:
+            queries = ['منتدى تسويق', 'منتدى تجارة ألكترونية']
+            
+    else: # جميع المنتديات العربية العامة
+        if clean_kw:
+            queries = [f'منتدى {clean_kw}', f'منتديات {clean_kw}']
+        else:
+            queries = ['منتدى', 'منتديات عربية']
+
+    all_results = []
+    seen_urls = set()
+    
+    for q in queries:
+        res = search_serper_single(q, api_key, num_results=max_per_query)
+        for item in res:
+            url = item['href']
+            # استبعاد المكرر
+            if url not in seen_urls:
+                seen_urls.add(url)
+                all_results.append(item)
+                
+    return all_results
+
 # --- الواجهة الرئيسية ---
-st.title("🌺 دليل واستخراج المنتديات النسائية والعربية الكبرى")
-st.write("أداة متخصصة للوصول لأشهر المنتديات الحقيقية (عالم حواء، سيدتي، كويتيات، فتكات) والمجتمعات الفعالة.")
+st.title("💬 أداة استخراج لينكات المنتديات فقط")
+st.write("أداة مخصصة لجلب واستخراج الروابط المباشرة للمنتديات العربية والنسائية الرسمية فقط.")
 
 # الشريط الجانبي
 st.sidebar.header("🔑 إعدادات المفتاح والبحث")
 serper_api_key = st.sidebar.text_input("ألصقي مفتاح Serper API هنا:", type="password")
-max_results = st.sidebar.slider("عدد النتائج المراد جلبها في البحث:", 5, 30, 15)
+max_results = st.sidebar.slider("عدد المنتديات المطلوبة لكل كلمة:", 5, 20, 10)
 
-# استخدام التبويبات (Tabs)
-tab1, tab2 = st.tabs(["🏆 المنتديات النسائية والعامة الكبرى (جاهزة)", "🔍 بحث تخصصي ذكي في جوجل"])
+# التبويبات
+tab1, tab2 = st.tabs(["🏆 لينكات المنتديات الكبرى (جاهزة)", "🔍 بحث واستخراج منتديات جديدة"])
 
-# --- التبويب الأول: الدليل الجاهز ---
+# --- التبويب الأول ---
 with tab1:
-    st.subheader("👑 قائمة المنتديات والمجتمعات العربية الأيقونية الكبرى:")
-    st.write("هذه القائمة تضم أشهر المنتديات عالية الترافيك التي يبحث عنها الجميع (مفحوصة وجاهزة الاستخدام):")
+    st.subheader("👑 لينكات المنتديات العربية الكبرى الجاهزة:")
+    st.write("قائمة بأهم المنتديات النسائية والعامة الرسمية بروابطها المباشرة:")
     
     df_featured = pd.DataFrame(FEATURED_FORUMS)
     st.dataframe(df_featured, use_container_width=True)
     
     csv_featured = df_featured.to_csv(index=False, encoding='utf-8-sig')
     st.download_button(
-        label="📥 تحميل دليل المنتديات الكبرى ملف Excel/CSV",
+        label="📥 تحميل ملف لينكات المنتديات الكبرى CSV",
         data=csv_featured,
-        file_name='major_arabic_forums.csv',
+        file_name='forums_links_direct.csv',
         mime='text/csv',
     )
 
-# --- التبويب الثاني: البحث التخصصي الذكي ---
+# --- التبويب الثاني ---
 with tab2:
-    st.subheader("🔍 بحث مستهدف في المنتديات والمجتمعات:")
+    st.subheader("🔍 استخراج لينكات منتديات جديدة بكلمة مفتاحية:")
     
     with st.form("search_form"):
-        keyword = st.text_input("أدخل الكلمة المفتاحية (مثلاً: ملابس, عبايات, تجميل, طبخ):", value="ملابس")
-        target_niche = st.selectbox("حددي نوع المنتديات المطلوبة:", ["منتديات نسائية وموضة (عالم حواء، كويتيات...)", "منتديات عامة ومجتمعات", "منتديات تجارة وتسويق"])
-        submit_button = st.form_submit_button("🚀 ابدأ البحث المستهدف")
+        keyword = st.text_input("أدخل الكلمة المفتاحية (مثلاً: ملابس, عبايات, تجميل - أو اتركها فارغة):", value="ملابس")
+        category = st.selectbox(
+            "اختر تخصص المنتديات المطلوبة:",
+            [
+                "🌸 منتديات نسائية وموضة وأزياء", 
+                "🌐 جميع المنتديات العربية العامة",
+                "💼 منتديات تجارة وتسويق وبزنس"
+            ]
+        )
+        submit_button = st.form_submit_button("🚀 استخراج لينكات المنتديات فوراً")
 
     if submit_button:
         if not serper_api_key:
             st.warning("⚠️ يرجى لصق مفتاح Serper API في القائمة الجانبية على اليمين أولاً لتشغيل البحث!")
         else:
-            clean_keyword = keyword.strip()
-            
-            # صياغة الاستعلام المتقدم الموجه للمنصات الكبرى
-            if target_niche == "منتديات نسائية وموضة (عالم حواء، كويتيات...)":
-                query = f'منتدى {clean_keyword} "حواء" OR "سيدتي" OR "كويتيات" OR "فتكات" OR "نسائي"'
-            elif target_niche == "منتديات تجارة وتسويق":
-                query = f'منتدى {clean_keyword} "تجارة" OR "تسويق" OR "ترايدنت" OR "سوق"'
-            else:
-                query = f'منتدى {clean_keyword}'
-                
-            st.info(f"🔎 جاري البحث المستهدف عن: **{clean_keyword}** في المنتديات المتخصصة...")
+            clean_kw = keyword.strip()
+            st.info(f"🔎 جاري البحث المكثف واستخراج لينكات المنتديات لـ: **{clean_kw if clean_kw else 'المنتديات العامة'}**...")
             
             progress_bar = st.progress(0)
             status_text = st.empty()
             
-            raw_results = search_serper(query, serper_api_key, num_results=max_results)
+            raw_results = search_forums_only(clean_kw, category, serper_api_key, max_per_query=max_results)
             total = len(raw_results)
             found_data = []
             
@@ -167,31 +200,31 @@ with tab2:
                     title = item['title']
                     domain = urlparse(url).netloc
                     
-                    status_text.text(f"جاري فحص ({index+1}/{total}): {domain}...")
+                    status_text.text(f"جاري فحص وتأكيد رابط المنتدى ({index+1}/{total}): {domain}...")
                     progress_bar.progress((index + 1) / total)
                     
                     is_dofollow, status = analyze_forum(url)
                     
                     found_data.append({
-                        "اسم المنتدى / البوست": title,
+                        "اسم المنتدى": title,
                         "الرابط المباشر": url,
                         "الدومين": domain,
                         "حالة اللينك": status
                     })
-                    time.sleep(0.1)
+                    time.sleep(0.05)
                     
-                status_text.success("✨ اكتمل استخراج المنتديات المستهدفة بنجاح!")
+                status_text.success(f"✨ اكتمل استخراج {len(found_data)} رابط منتدى مباشر بنجاح!")
                 
                 df = pd.DataFrame(found_data)
-                st.subheader(f"📊 المنتديات المستخرجة ({len(found_data)} موقع):")
+                st.subheader(f"📊 قائمة لينكات المنتديات الناتجة ({len(found_data)} منتدى):")
                 st.dataframe(df, use_container_width=True)
                 
                 csv = df.to_csv(index=False, encoding='utf-8-sig')
                 st.download_button(
-                    label="📥 تحميل النتائج ملف Excel/CSV",
+                    label="📥 تحميل لينكات المنتديات ملف Excel/CSV",
                     data=csv,
-                    file_name=f'targeted_forums_{clean_keyword}.csv',
+                    file_name=f'forums_{clean_kw if clean_kw else "general"}.csv',
                     mime='text/csv',
                 )
             else:
-                st.error("لم يتم العثور على نتائج، جربي اختيار فئة أخرى أو كلمة مفتاحية أعم.")
+                st.error("لم يتم العثور على نتائج، جربي تغيير الكلمة المفتاحية أو التخصص.")
