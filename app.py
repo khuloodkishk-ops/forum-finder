@@ -7,10 +7,15 @@ import time
 import urllib3
 import json
 
+# تعطيل تحذيرات SSL لضمان سلاسة الفحص
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# --- إعدادات الصفحة ---
-st.set_page_config(page_title="مستخرج المنتديات والمجتمعات", page_icon="🔍", layout="wide")
+# --- 1. إعدادات الصفحة والتصميم العربي ---
+st.set_page_config(
+    page_title="مستخرج المنتديات والمجتمعات",
+    page_icon="🔍",
+    layout="wide"
+)
 
 st.markdown("""
     <style>
@@ -19,7 +24,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- دالة فحص المنتدى والـ DoFollow ---
+
+# --- 2. دالة فحص المنتدى وتحديد نوع الروابط (DoFollow / NoFollow) ---
 def analyze_forum(url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -54,7 +60,8 @@ def analyze_forum(url):
     except Exception:
         return True, "⚠️ تحتاج فحص يدوي"
 
-# --- دالة البحث المباشر عبر Serper.dev ---
+
+# --- 3. دالة البحث المباشر عبر Google API (Serper.dev) متوافقة 100% مع الحساب المجاني ---
 def search_serper(query, api_key, num_results=15):
     url = "https://google.serper.dev/search"
     clean_api_key = str(api_key).strip()
@@ -89,33 +96,42 @@ def search_serper(query, api_key, num_results=15):
         st.error(f"خطأ في الاتصال بالشبكة: {str(e)}")
         return []
 
-# --- الواجهة الرئيسية ---
-st.title("🔍 أداة استخراج المنتديات والمجتمعات (Serper Engine)")
+
+# --- 4. الواجهة الرئيسية والتفاعل ---
+st.title("🔍 أداة استخراج المنتديات والمجتمعات العالية الأثورتي")
 st.write("أداة أوتوميشن مجانية لبحث وفحص المنتديات والمجتمعات الرسمية من جوجل مباشرة.")
 
-# الشريط الجانبي
+# الشريط الجانبي للإعدادات
 st.sidebar.header("🔑 إعدادات المفتاح والبحث")
 serper_api_key = st.sidebar.text_input("ألصقي مفتاح Serper API هنا:", type="password")
 max_results = st.sidebar.slider("عدد النتائج المراد جلبها:", 5, 30, 15)
 
-# نموذج البحث المباشر
+# نموذج البحث
 with st.form("search_form"):
-    keyword = st.text_input("أدخل الكلمة المفتاحية أو المجال (مثلاً: ملابس, تسويق, عقارات):", value="جريده")
+    keyword = st.text_input(
+        "أدخل الكلمة المفتاحية أو المجال (اتركيها فارغة لجلب منتديات عامة):", 
+        value="", 
+        placeholder="مثلاً: ملابس, تسويق, عقارات, أو اتركها فارغة لمنتديات عامة..."
+    )
     submit_button = st.form_submit_button("🚀 ابدأ البحث والأوتوميشن")
 
 if submit_button:
     if not serper_api_key:
         st.warning("⚠️ يرجى لصق مفتاح Serper API في القائمة الجانبية على اليمين أولاً لتشغيل البحث!")
-    elif not keyword.strip():
-        st.warning("يرجى كتابة كلمة مفتاحية للبحث.")
     else:
-        st.info(f"🔎 جاري البحث في جوجل عن منتديات ومجتمعات: **{keyword}**...")
+        clean_keyword = keyword.strip()
         
-        is_arabic = any('\u0600' <= c <= '\u06FF' for c in keyword)
-        if is_arabic:
-            query = f'منتدى {keyword} OR "مجتمع" {keyword} OR site:forum.* {keyword}'
+        # صياغة استعلام بسيطة وطبيعية متوافقة 100% مع الحساب المجاني
+        if not clean_keyword:
+            st.info("🔎 جاري البحث في جوجل عن منتديات ومجتمعات عامة...")
+            query = "منتدى"
         else:
-            query = f'{keyword} forum OR community OR "powered by discourse"'
+            st.info(f"🔎 جاري البحث في جوجل عن منتديات متعلقة بـ: **{clean_keyword}**...")
+            is_arabic = any('\u0600' <= c <= '\u06FF' for c in clean_keyword)
+            if is_arabic:
+                query = f'منتدى {clean_keyword}'
+            else:
+                query = f'{clean_keyword} forum'
             
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -149,10 +165,13 @@ if submit_button:
             st.subheader(f"📊 المنتديات والمجتمعات التي تم العثور عليها ({len(found_data)} موقع):")
             st.dataframe(df, use_container_width=True)
             
+            # زر تحميل Excel/CSV
             csv = df.to_csv(index=False, encoding='utf-8-sig')
             st.download_button(
                 label="📥 تحميل النتائج ملف Excel/CSV",
                 data=csv,
-                file_name=f'google_forums_{keyword}.csv',
+                file_name=f'google_forums_{clean_keyword if clean_keyword else "general"}.csv',
                 mime='text/csv',
             )
+        else:
+            st.error("لم يتم العثور على نتائج، تأكدي من صحة المفتاح أو جربي كلمة بحث أخرى.")
